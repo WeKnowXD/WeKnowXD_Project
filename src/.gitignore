@@ -1,0 +1,11 @@
+#ignore in src/
+
+*.db
+*.schema
+*.tmp
+*.sql
+
+#ignore for /backend
+
+/backend/venv
+/backend/__pycache__/
