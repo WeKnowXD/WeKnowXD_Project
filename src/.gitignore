@@ -1,9 +1,11 @@
 #ignore in src/
 
+.venv/
 *.db
 *.schema
 *.tmp
 *.sql
+*.env
 
 #ignore for /backend
 
