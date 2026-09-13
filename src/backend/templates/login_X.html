@@ -1,0 +1,33 @@
+<!doctype html>
+<title>¿Who Knows? - Sign In</title>
+<link rel="stylesheet" type="text/css" href="/static/style.css" />
+<div class="page">
+  <div class="navigation">
+    <nav>
+      <h1><a id="nav-logo" href="/">¿Who Knows?</a></h1>
+      <a id="nav-login" href="/login">Log in</a>
+      <a id="nav-register" href="/register">Register</a>
+    </nav>
+  </div>
+
+  <div class="body">
+    <h2>Log In</h2>
+    {{if .Error}}
+    <div class="error"><strong>Error:</strong> {{.Error}}</div>
+    {{end}}
+    <form action="/api/login" method="POST">
+      <dl>
+        <dt>Username:
+        <dd><input type="text" name="username" size="30" value="{{.Username}}">
+        <dt>Password:
+        <dd><input type="password" name="password" size="30">
+      </dl>
+      <div class="actions"><input type="submit" id="login-button" value="Log In"></div>
+    </form>
+  </div>
+
+  <div class="footer">
+    <span>¿Who Knows? &copy; 2009</span>
+    <a href="/about">About</a>
+  </div>
+</div>
