@@ -11,3 +11,4 @@
 
 /backend/venv
 /backend/__pycache__/
+/backend/go.mod
