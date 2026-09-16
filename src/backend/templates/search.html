@@ -1,43 +1,35 @@
-{% extends "layout.html" %}
-{% block title %}
-{% endblock %}
-{% block body %}
-<div>
-  <input id="search-input" placeholder="Search..." value="{{ request.args.get('q', '') }}"/>
-  <button id="search-button" onclick="makeSearchRequest()">Search</button>
-</div>
+<!doctype html>
+<html>
+  <head>
+    <title>Search</title>
+  </head>
+  <body>
+    <div>
+      <form method="GET" action="/">
+        <!-- GET-metode + endpoint "/", fordi søgning kun læser data -->
+        <input
+          id="search-input"
+          name="q"
+          placeholder="Search..."
+          value="{{ .Query }}"
+        />
+        <!-- name="q" sendes som URL-parameter, value viser sidste søgning -->
+        <button type="submit">Search</button>
+        <!-- Sender formularen af sted uden JS -->
+      </form>
+    </div>
 
-<div id="results">
-  {% for result in search_results %}
-  <div>
-      <h2><a class="search-result-title" href="{{ result.url }}">{{ result.title }}</a></h2>
-      <p class="search-result-description">{{ result.description }}</p>
-  </div>
-  {% endfor %}
-</div>
-
-<script>
-  let searchInput;
-
-  document.addEventListener('DOMContentLoaded', () => {
-    searchInput = document.getElementById("search-input");
-
-    // Focus the input field
-    searchInput.focus();
-
-    // Search when the user presses Enter
-    searchInput.addEventListener('keypress', (event) => {
-        if (event.key === 'Enter') {
-          makeSearchRequest();
-        }
-    });
-  });
-
-  function makeSearchRequest() {
-    const query = searchInput.value;
-    const url = new URL(window.location.href);
-    url.searchParams.set('q', query);
-    window.location.href = url.toString();
-  }
-</script>
-{% endblock %}
+    <div id="results">
+      {{ range .Results }}
+      <!-- Looper igennem .Results-listen fra Go -->
+      <div>
+        <h2><a href="{{ .URL }}">{{ .Title }}</a></h2>
+        <!-- Titel som klikbart link til resultatets URL -->
+        <p>{{ .Description }}</p>
+        <!-- Kort beskrivelse af resultatet -->
+      </div>
+      {{ end }}
+      <!-- Slutter loopet -->
+    </div>
+  </body>
+</html>

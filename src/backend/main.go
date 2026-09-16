@@ -5,7 +5,7 @@ import (
 	"net/http"
 )
 
-var templates = template.Must(template.ParseFiles("templates/search_X.html", "templates/register_X.html"))
+var templates = template.Must(template.ParseFiles("templates/search.html", "templates/register.html"))
 
 type PageData struct {
 	Query   string
@@ -31,7 +31,7 @@ func main() {
 			return
 		}
 		data := PageData{Query: r.URL.Query().Get("q")}
-		templates.ExecuteTemplate(w, "search_X.html", data)
+		templates.ExecuteTemplate(w, "search.html", data)
 	})
 
 	http.HandleFunc("/register", func(w http.ResponseWriter, r *http.Request) {
@@ -39,8 +39,8 @@ func main() {
 			http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
 			return
 		}
-		templates.ExecuteTemplate(w, "register_X.html", RegisterData{})
+		templates.ExecuteTemplate(w, "register.html", RegisterData{})
 	})
-
+	
 	http.ListenAndServe(":8080", nil)
 }
