@@ -2,26 +2,81 @@ package main
 
 import (
 	"crypto/md5"
-	"database/sql"
+	"crypto/rand"
 	"encoding/hex"
 	"encoding/json"
-	"html/template"
+
 	"log"
 	"net/http"
+
+	"time"
+
 	"strings"
 
-	_ "github.com/mattn/go-sqlite3" // this one's blank on purpose, we're not calling anything from it
-	// directly, it just needs to load so sqlite3 gets registered as a driver
-	//note: youll need to install a C compiler for this to work, since the SQLite3 driver is a cgo package:) and also do go env -w CGO_ENABLED=1 if its not already enabled
+	"sync"
+
+	"html/template"
+
+	"fmt"
+
+	"reflect"
+
+	"database/sql"
+
+	_ "github.com/mattn/go-sqlite3"
 )
 
+var db *sql.DB // shared connection, every handler in this file can just use this directly
 var templates = template.Must(template.ParseFiles("templates/search.html", "templates/register.html", "templates/layout.html"))
 
 func main() {
-	initDB() // gotta connect to the db before the server starts taking requests
-	mux := http.NewServeMux()
-	router(mux)
-	http.ListenAndServe(":8080", mux)
+	dataBase := newDataBase()
+	defer dataBase.Close()
+
+	server := newServer(dataBase)
+
+	http.ListenAndServe(":8080", server.Mux)
+}
+
+func (server *Server) router() {
+	server.Mux.HandleFunc("POST /api/login", server.apiLogin)
+	server.Mux.HandleFunc("GET /api/test", server.apiTestDB)
+
+	fileServer := http.FileServer(http.Dir("./templates"))
+
+	server.Mux.Handle("/templates/", http.StripPrefix("/templates/", fileServer))
+
+	server.Mux.Handle("/", fileServer)
+}
+
+func (server *Server) apiTestDB(w http.ResponseWriter, r *http.Request) {
+	userList := server.queryDB(reflect.TypeOf(User{}), "SELECT * FROM users")
+
+	if len(userList) == 0 {
+		w.Header().Set("Content-Type", "text/plain")
+		w.Write([]byte("database connected"))
+		return
+	}
+
+	firstUser := userList[0].(User)
+	println("Test succes, found user:", firstUser.Username)
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(userList)
+}
+
+type Server struct {
+	Mux           *http.ServeMux
+	DB            *sql.DB
+	Sessions      map[string]int
+	SessionsMutex sync.RWMutex
+}
+
+type User struct {
+	Id       int
+	Username string
+	Email    string
+	Password string
 }
 
 type PageData struct {
@@ -39,44 +94,107 @@ type RegisterData struct {
 	Email    string
 }
 
-func router(mux *http.ServeMux) {
-	mux.HandleFunc("GET /{$}", layoutHandler)
-	mux.HandleFunc("GET /register", registerHandler)
-	mux.HandleFunc("GET /search", searchHandler)
-	mux.HandleFunc("GET /api/search", getSearch)
-	mux.HandleFunc("POST /api/register", postRegister)
-	mux.Handle("/static/", http.StripPrefix("/static/", http.FileServer(http.Dir("static"))))
+func newServer(dataBase *sql.DB) *Server {
+	server := &Server{
+		DB:       dataBase,
+		Mux:      http.NewServeMux(),
+		Sessions: make(map[string]int),
+	}
 
+	server.router()
+	return server
 }
 
-// TODO: currently passing nil since we don't have session/auth handling yet.
-// Once that's built, replace this with a struct (e.g. LayoutData) holding
-// User (nil if not logged in) and Flashes ([]string), so layout.html's
-// {{ if .User }} and {{ if .Flashes }} blocks actually have data to work with.
-func layoutHandler(w http.ResponseWriter, r *http.Request) {
-	templates.ExecuteTemplate(w, "layout.html", nil)
-}
-
-func searchHandler(w http.ResponseWriter, r *http.Request) {
-	data := PageData{Query: r.URL.Query().Get("q")}
-	templates.ExecuteTemplate(w, "layout.html", data)
-}
-
-func registerHandler(w http.ResponseWriter, r *http.Request) {
-	templates.ExecuteTemplate(w, "register.html", RegisterData{})
-}
-
-var db *sql.DB // shared connection, every handler in this file can just use this directly
-
-func initDB() {
-	var err error
-	db, err = sql.Open("sqlite3", "../whoknows.db") // note this is = not :=, since db already exists above
+func newDataBase() *sql.DB {
+	db, err := sql.Open("sqlite3", "../whoknows.db")
 	if err != nil {
+		log.Fatalf("Failed to open database: %v", err)
+	}
+
+	if err := db.Ping(); err != nil {
+		log.Fatalf("Failed to ping database: %v", err)
+	}
+
+	fmt.Println("Successfully connected to SQLite database")
+
+	return db
+}
+
+func generateSessionToken() string {
+	b := make([]byte, 16)
+	rand.Read(b)
+	return hex.EncodeToString(b)
+}
+
+func (server *Server) apiLogin(w http.ResponseWriter, r *http.Request) {
+	error := r.ParseForm()
+	if error != nil {
+		log.Fatal(error)
+	}
+
+	userList := server.queryDB(reflect.TypeOf(User{}), "SELECT * FROM users WHERE username = ?", r.FormValue("username"))
+	if len(userList) == 0 {
+		log.Println("func: apiLogin, queryDB returned empty userlist when seaching for username: " + r.FormValue("username"))
+	}
+
+	foundUser := userList[0].(User)
+
+	if verifyPassword(foundUser.Password, r.FormValue("password")) == false {
+		log.Println("func: apiLogin, user verifacation password missmatch")
+	} else {
+		token := generateSessionToken()
+
+		server.SessionsMutex.Lock()
+		server.Sessions[token] = foundUser.Id
+		server.SessionsMutex.Unlock()
+
+		http.SetCookie(w, &http.Cookie{
+			Name:     "session_token",
+			Value:    token,
+			Expires:  time.Now().Add(24 * time.Hour),
+			Path:     "/",
+			HttpOnly: true,
+		})
+
+		println("User", foundUser.Username, "is currently logged in with session")
+		w.Write([]byte("Login succesfull"))
+	}
+}
+
+func (server *Server) queryDB(interchangeableStruct reflect.Type, query string, args ...any) []any {
+	var structArray []any
+	rows, error := server.DB.Query(query, args...)
+
+	if error != nil {
+		log.Fatal(error)
+	}
+	defer rows.Close()
+
+	for rows.Next() {
+		newStructPointer := reflect.New(interchangeableStruct)
+		structElement := newStructPointer.Elem()
+
+		numCols := structElement.NumField()
+		columns := make([]any, numCols)
+
+		for i := range numCols {
+			field := structElement.Field(i)
+			columns[i] = field.Addr().Interface()
+		}
+
+		error := rows.Scan(columns...)
+		if error != nil {
+			log.Fatal(error)
+		}
+
+		structArray = append(structArray, structElement.Interface())
+	}
+
+	if err := rows.Err(); err != nil {
 		log.Fatal(err)
 	}
-	if err = db.Ping(); err != nil { // Open doesn't actually connect, Ping is what forces the real check
-		log.Fatal(err)
-	}
+
+	return structArray
 }
 
 func getSearch(w http.ResponseWriter, r *http.Request) {
@@ -179,6 +297,14 @@ func postRegister(w http.ResponseWriter, r *http.Request) {
 }
 
 func hashPassword(password string) string {
-	hash := md5.Sum([]byte(password)) // md5 for now, swapping to bcrypt later
-	return hex.EncodeToString(hash[:])
+	passwordBytes := []byte(password)
+	passwordHash := md5.Sum(passwordBytes)
+	passwordHashString := hex.EncodeToString(passwordHash[:])
+
+	return passwordHashString
+}
+
+func verifyPassword(storedHash string, password string) bool {
+	passwordHash := hashPassword(password)
+	return storedHash == passwordHash
 }
