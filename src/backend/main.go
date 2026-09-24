@@ -182,3 +182,13 @@ func hashPassword(password string) string {
 	hash := md5.Sum([]byte(password)) // md5 for now, swapping to bcrypt later
 	return hex.EncodeToString(hash[:])
 }
+
+
+
+func TestFunction() {
+	if true {
+		return
+	} else {
+		println("dette er en test")
+	}
+}
