@@ -1,3 +1,4 @@
+// Package main implements the backend server for the WhoKnows search and registration app.
 package main
 
 import (
@@ -53,7 +54,7 @@ func router(mux *http.ServeMux) {
 // Once that's built, replace this with a struct (e.g. LayoutData) holding
 // User (nil if not logged in) and Flashes ([]string), so layout.html's
 // {{ if .User }} and {{ if .Flashes }} blocks actually have data to work with.
-func layoutHandler(w http.ResponseWriter, r *http.Request) {
+func layoutHandler(w http.ResponseWriter, _ *http.Request) {
 	templates.ExecuteTemplate(w, "layout.html", nil)
 }
 
@@ -62,7 +63,7 @@ func searchHandler(w http.ResponseWriter, r *http.Request) {
 	templates.ExecuteTemplate(w, "layout.html", data)
 }
 
-func registerHandler(w http.ResponseWriter, r *http.Request) {
+func registerHandler(w http.ResponseWriter, _ *http.Request) {
 	templates.ExecuteTemplate(w, "register.html", RegisterData{})
 }
 
@@ -184,11 +185,3 @@ func hashPassword(password string) string {
 }
 
 
-
-func TestFunction() {
-	if true {
-		return
-	} else {
-		println("dette er en test")
-	}
-}
