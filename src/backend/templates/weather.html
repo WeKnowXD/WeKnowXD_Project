@@ -1,0 +1,43 @@
+<!doctype html>
+<html>
+  <head>
+    <title>Log In</title>
+    <link rel="stylesheet" href="/static/style.css" />
+  </head>
+  <body>
+  <h1>Todays Weather in Copenhagen</h1>
+
+  <table>
+    <tr>
+      <th>Date</th>
+      <th>Condition</th>
+      <th>Min °C</th>
+      <th>Max °C</th>
+      <th>Rain %</th>
+    </tr>
+    <tr>
+      <td id="date"></td>
+      <td id="condition"></td>
+      <td id="min"></td>
+      <td id="max"></td>
+      <td id="rain"></td>
+    </tr>
+  </table>
+
+  <script>
+    
+fetch("/api/weather")
+      .then(response => response.json())
+      .then(body => {
+        const today = body.data.forecast.forecastday[0];
+
+        document.getElementById("date").textContent = today.date;
+        document.getElementById("condition").textContent = today.day.condition.text;
+        document.getElementById("min").textContent = today.day.mintemp_c;
+        document.getElementById("max").textContent = today.day.maxtemp_c;
+        document.getElementById("rain").textContent = today.day.daily_chance_of_rain;
+    });
+
+  </script>
+  </body>
+</html>

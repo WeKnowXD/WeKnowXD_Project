@@ -34,7 +34,8 @@ var templates = template.Must(template.ParseFiles(
 	"templates/search.html",
 	"templates/register.html",
 	"templates/layout.html",
-	"templates/login.html"))
+	"templates/login.html",
+	"templates/weather.html"))
 
 var (
 	Sessions      map[string]SessionData
@@ -61,6 +62,8 @@ func router(mux *http.ServeMux) {
 	mux.HandleFunc("GET /api/search", getSearch)
 	mux.HandleFunc("GET /login", loginHandler)
 	mux.HandleFunc("GET /api/weather", apiWeather)
+
+	mux.HandleFunc("GET /weather", weatherHandler)
 
 	mux.HandleFunc("POST /api/register", postRegister)
 	mux.HandleFunc("POST /api/login", apiLogin)
@@ -131,6 +134,10 @@ func registerHandler(w http.ResponseWriter, r *http.Request) {
 
 func loginHandler(w http.ResponseWriter, r *http.Request) {
 	templates.ExecuteTemplate(w, "login.html", LoginData{})
+}
+
+func weatherHandler(w http.ResponseWriter, r *http.Request) {
+	templates.ExecuteTemplate(w, "weather.html", LoginData{})
 }
 
 func generateSessionToken() string {
