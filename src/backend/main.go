@@ -5,6 +5,7 @@ import (
 	"crypto/rand"
 	"encoding/hex"
 	"encoding/json"
+	"errors"
 	"os"
 
 	"log"
@@ -33,7 +34,8 @@ var templates = template.Must(template.ParseFiles(
 	"templates/search.html",
 	"templates/register.html",
 	"templates/layout.html",
-	"templates/login.html"))
+	"templates/login.html",
+	"templates/weather.html"))
 
 var (
 	Sessions      map[string]SessionData
@@ -61,8 +63,11 @@ func router(mux *http.ServeMux) {
 	mux.HandleFunc("GET /login", loginHandler)
 	mux.HandleFunc("GET /api/weather", apiWeather)
 
+	mux.HandleFunc("GET /weather", weatherHandler)
+
 	mux.HandleFunc("POST /api/register", postRegister)
 	mux.HandleFunc("POST /api/login", apiLogin)
+	mux.HandleFunc("GET /api/logout", apiLogout)
 	mux.HandleFunc("POST /test", testSessions)
 
 	mux.Handle("/static/", http.StripPrefix("/static/", http.FileServer(http.Dir("static"))))
@@ -70,6 +75,21 @@ func router(mux *http.ServeMux) {
 
 func testSessions(w http.ResponseWriter, r *http.Request) {
 	fmt.Println(Sessions)
+}
+
+type ValidationError struct {
+	Loc  []string `json:"loc"`
+	Msg  string   `json:"msg"`
+	Type string   `json:"type"`
+}
+
+type HTTPValidationError struct {
+	Detail []ValidationError `json:"detail"`
+}
+
+type AuthResponse struct {
+	StatusCode int    `json:"statusCode"`
+	Message    string `json:"message"`
 }
 
 type SessionData struct {
@@ -126,71 +146,125 @@ func loginHandler(w http.ResponseWriter, r *http.Request) {
 	templates.ExecuteTemplate(w, "login.html", LoginData{})
 }
 
+func weatherHandler(w http.ResponseWriter, r *http.Request) {
+	templates.ExecuteTemplate(w, "weather.html", LoginData{})
+}
+
 func generateSessionToken() string {
 	b := make([]byte, 16)
 	rand.Read(b)
 	return hex.EncodeToString(b)
 }
 
+func writeJSON(w http.ResponseWriter, status int, body any) {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(status)
+	json.NewEncoder(w).Encode(body)
+}
+
 func apiLogin(w http.ResponseWriter, r *http.Request) {
-	error := r.ParseForm()
-	if error != nil {
-		log.Fatal(error)
+	if err := r.ParseForm(); err != nil {
+		writeJSON(w, http.StatusUnprocessableEntity, HTTPValidationError{
+			Detail: []ValidationError{{
+				Loc:  []string{"body"},
+				Msg:  "Invalid form data or a bad request",
+				Type: "value_error.missing",
+			}},
+		})
 		return
 	}
 
-	userList := queryDB(reflect.TypeOf(User{}), "SELECT * FROM users WHERE username = ?", r.FormValue("username"))
-	if len(userList) == 0 {
-		log.Println("func: apiLogin, queryDB returned empty userlist when seaching for username: " + r.FormValue("username"))
-		w.WriteHeader(http.StatusUnauthorized)
-		templates.ExecuteTemplate(w, "login.html", LoginData{
+	var missing []ValidationError
+	for _, f := range []string{"username", "password"} {
+		if _, ok := r.PostForm[f]; !ok {
+			missing = append(missing, ValidationError{Loc: []string{"body", f}, Msg: "Field required", Type: "missing"})
+		}
+	}
+	if len(missing) > 0 {
+		writeJSON(w, http.StatusUnprocessableEntity, HTTPValidationError{Detail: missing})
+		return
+	}
 
-			Error:    "Invalid username or password",
-			Username: r.FormValue("username")})
+	userList, err := queryDB(reflect.TypeOf(User{}), "SELECT * FROM users WHERE username = ?", r.FormValue("username"))
+	if err != nil {
+		log.Println(err)
+		writeJSON(w, http.StatusInternalServerError, AuthResponse{StatusCode: http.StatusInternalServerError, Message: "server error"})
+		return
+	}
+	if len(userList) == 0 {
+		writeJSON(w, http.StatusUnauthorized, AuthResponse{StatusCode: http.StatusUnauthorized, Message: "Invalid username"})
 		return
 	}
 
 	foundUser := userList[0].(User)
 
 	if verifyPassword(foundUser.Password, r.FormValue("password")) == false {
-		log.Println("func: apiLogin, user verifacation password missmatch")
-		w.WriteHeader(http.StatusUnauthorized)
-		templates.ExecuteTemplate(w, "login.html", LoginData{
-
-			Error:    "Invalid username or password",
-			Username: r.FormValue("username"),
-		})
+		writeJSON(w, http.StatusUnauthorized, AuthResponse{StatusCode: http.StatusUnauthorized, Message: "Invalid password"})
 		return
-	} else {
-		token := generateSessionToken()
-
-		SessionsMutex.Lock()
-		Sessions[token] = SessionData{
-			UserID:    foundUser.Id,
-			Username:  foundUser.Username,
-			ExpiresAt: time.Now().Add(24 * time.Hour),
-		}
-		SessionsMutex.Unlock()
-
-		http.SetCookie(w, &http.Cookie{
-			Name:     "session_token",
-			Value:    token,
-			Expires:  time.Now().Add(24 * time.Hour),
-			Path:     "/",
-			HttpOnly: true,
-		})
-
-		println("User", foundUser.Username, "is currently logged in with session")
-		w.Write([]byte("Login succesfull"))
 	}
+
+	token := generateSessionToken()
+
+	SessionsMutex.Lock()
+	Sessions[token] = SessionData{
+		UserID:    foundUser.Id,
+		Username:  foundUser.Username,
+		ExpiresAt: time.Now().Add(24 * time.Hour),
+	}
+	SessionsMutex.Unlock()
+
+	http.SetCookie(w, &http.Cookie{
+		Name:     "session_token",
+		Value:    token,
+		Expires:  time.Now().Add(24 * time.Hour),
+		Path:     "/",
+		HttpOnly: true,
+	})
+
+	println("User", foundUser.Username, "is currently logged in with session")
+	writeJSON(w, http.StatusOK, AuthResponse{StatusCode: http.StatusOK, Message: "Login successful"})
 }
 
-func queryDB(interchangeableStruct reflect.Type, query string, args ...any) []any {
-	var structArray []any
-	rows, error := db.Query(query, args...)
+func apiLogout(w http.ResponseWriter, r *http.Request) {
+	cookie, err := r.Cookie("session_token")
+	if errors.Is(err, http.ErrNoCookie) {
+		writeJSON(w, http.StatusBadRequest, AuthResponse{
+			StatusCode: http.StatusBadRequest,
+			Message:    "no cookie was found",
+		})
+		return
+	} else if err != nil {
+		log.Println(err)
+		writeJSON(w, http.StatusInternalServerError, AuthResponse{
+			StatusCode: http.StatusInternalServerError,
+			Message:    "server error",
+		})
+		return
+	}
 
-	if error != nil {
-		log.Fatal(error)
+	SessionsMutex.Lock()
+	delete(Sessions, cookie.Value)
+	SessionsMutex.Unlock()
+
+	http.SetCookie(w, &http.Cookie{
+		Name:     "session_token",
+		Value:    "",
+		Path:     "/",
+		MaxAge:   -1,
+		HttpOnly: true,
+	})
+
+	writeJSON(w, http.StatusOK, AuthResponse{
+		StatusCode: http.StatusOK,
+		Message:    "Logout successful",
+	})
+}
+
+func queryDB(interchangeableStruct reflect.Type, query string, args ...any) ([]any, error) {
+	var structArray []any
+	rows, err := db.Query(query, args...)
+	if err != nil {
+		return nil, err
 	}
 	defer rows.Close()
 
@@ -206,19 +280,18 @@ func queryDB(interchangeableStruct reflect.Type, query string, args ...any) []an
 			columns[i] = field.Addr().Interface()
 		}
 
-		error := rows.Scan(columns...)
-		if error != nil {
-			log.Fatal(error)
+		if err := rows.Scan(columns...); err != nil {
+			return nil, err
 		}
 
 		structArray = append(structArray, structElement.Interface())
 	}
 
 	if err := rows.Err(); err != nil {
-		log.Fatal(err)
+		return nil, err
 	}
 
-	return structArray
+	return structArray, nil
 }
 
 func initDB() {
