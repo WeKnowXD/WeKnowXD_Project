@@ -1,0 +1,18 @@
+name: Lint
+
+on:
+  push:
+    branches:
+      - development
+
+jobs:
+  revive:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: src/backend/go.mod
+      - run: go install github.com/mgechev/revive@latest
+      - run: revive -set_exit_status ./...
+        working-directory: src/backend
