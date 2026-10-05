@@ -1,0 +1,81 @@
+name: Release
+
+on:
+  pull_request:
+    types: [closed]
+    branches: [main]
+
+# GITHUB_TOKEN needs write access to create tags and releases
+permissions:
+  contents: write
+
+jobs:
+  release:
+    # "closed" also fires for rejected PRs, so only continue if it was merged
+    if: github.event.pull_request.merged == true
+    runs-on: ubuntu-latest
+    steps:
+      # The runner starts empty; fetch-depth 0 fetches full history including tags
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Determine release type from PR title
+        id: bump
+        env:
+          TITLE: ${{ github.event.pull_request.title }}
+        run: |
+          echo "PR title: $TITLE"
+          # Match the prefix case-insensitively
+          case "${TITLE,,}" in
+            major:*) TYPE=major ;;
+            minor:*) TYPE=minor ;;
+            fix:*)   TYPE=patch ;;
+            *)
+              echo "::error::PR title must start with major:, minor: or fix:"
+              exit 1 ;;
+          esac
+          # Pass the value on to later steps as steps.bump.outputs.type
+          echo "type=$TYPE" >> "$GITHUB_OUTPUT"
+
+      - name: Calculate new version
+        id: version
+        env:
+          TYPE: ${{ steps.bump.outputs.type }}
+        run: |
+          # Find the highest version tag; fail if none exists
+          LAST=$(git tag --list 'v*.*.*' --sort=-v:refname | head -n1)
+          if [ -z "$LAST" ]; then
+            echo "::error::No version tags found. Has the initial tag been created, and were tags fetched (fetch-depth: 0)?"
+            exit 1
+          fi
+          echo "Latest tag: $LAST"
+
+          # Strip the leading 'v' and split on dots
+          IFS=. read -r MAJOR MINOR FIX <<< "${LAST#v}"
+
+          # Bump the selected number and reset everything to its right
+          case "$TYPE" in
+            major) MAJOR=$((MAJOR+1)); MINOR=0; FIX=0 ;;
+            minor) MINOR=$((MINOR+1)); FIX=0 ;;
+            patch) FIX=$((FIX+1)) ;;
+          esac
+
+          NEW="v$MAJOR.$MINOR.$FIX"
+          echo "New version: $NEW"
+          echo "tag=$NEW" >> "$GITHUB_OUTPUT"
+
+      - name: Create release via GitHub API
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAG: ${{ steps.version.outputs.tag }}
+          # Tag the exact commit produced by the merge
+          SHA: ${{ github.event.pull_request.merge_commit_sha }}
+        run: |
+          # POST /repos/{owner}/{repo}/releases – GitHub creates the tag if it doesn't exist
+          gh api repos/${{ github.repository }}/releases \
+            -f tag_name="$TAG" \
+            -f target_commitish="$SHA" \
+            -f name="$TAG" \
+            -F generate_release_notes=true
+          echo "Created release $TAG"
