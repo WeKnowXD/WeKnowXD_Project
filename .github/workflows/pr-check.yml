@@ -1,0 +1,24 @@
+name: PR title check
+
+on:
+  pull_request:
+    # Re-run when the PR is opened, its title is edited, or new commits are pushed
+    types: [opened, edited, synchronize, reopened]
+    branches: [main]
+
+jobs:
+  title:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check release prefix in PR title
+        env:
+          TITLE: ${{ github.event.pull_request.title }}
+        run: |
+          # Title must start with major:, minor: or fix: (case-insensitive)
+          case "${TITLE,,}" in
+            major:*|minor:*|fix:*)
+              echo "OK: $TITLE" ;;
+            *)
+              echo "::error::PR title must start with major:, minor: or fix:"
+              exit 1 ;;
+          esac

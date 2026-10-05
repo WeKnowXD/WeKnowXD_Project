@@ -10,12 +10,6 @@
 - [ ] Documentation
 - [ ] Other:
 
-## Release-type
-
-- [ ] Major
-- [ ] Minor
-- [ ] Fix
-
 ## Changes made
 
 <!-- List the concrete changes, file by file or by area. -->
