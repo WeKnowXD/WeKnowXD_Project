@@ -17,20 +17,6 @@
 -
 -
 
-## How to test
-
-<!-- Steps to run/verify the change locally. -->
-1.
-2.
-3.
-
 ## Related issues
 
 <!-- e.g. Closes #12, Relates to #34 -->
-
-## Checklist
-
-- [ ] Code builds locally (`go build ./...`)
-- [ ] Tests pass (if applicable)
-- [ ] I have updated documentation where needed
-- [ ] I have reviewed my own code before requesting review
