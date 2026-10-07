@@ -135,6 +135,10 @@ type SearchResponse struct {
 	Data []SearchResult `json:"data"`
 }
 
+type WeatherResponse struct {
+	Data map[string]any `json:"data"`
+}
+
 // TODO: currently passing nil since we don't have session/auth handling yet.
 // Once that's built, replace this with a struct (e.g. LayoutData) holding
 // User (nil if not logged in) and Flashes ([]string), so layout.html's
