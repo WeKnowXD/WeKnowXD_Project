@@ -1,0 +1,227 @@
+basePath: /
+definitions:
+  main.AuthResponse:
+    description: AuthData
+    properties:
+      message:
+        type: string
+      statusCode:
+        type: integer
+    type: object
+  main.HTTPValidationError:
+    description: HTTPValidationError
+    properties:
+      detail:
+        items:
+          $ref: '#/definitions/main.ValidationError'
+        type: array
+    type: object
+  main.SearchResponse:
+    description: data
+    properties:
+      data:
+        items:
+          $ref: '#/definitions/main.SearchResult'
+        type: array
+    type: object
+  main.SearchResult:
+    type: object
+  main.ValidationError:
+    properties:
+      loc:
+        items:
+          type: string
+        type: array
+      msg:
+        type: string
+      type:
+        type: string
+    type: object
+  main.WeatherResponse:
+    description: WeatherData
+    properties:
+      data:
+        additionalProperties: {}
+        type: object
+    type: object
+host: 51.120.81.214:8080
+info:
+  contact: {}
+  description: WeatherData
+  title: WeKnowXD
+  version: "1.0"
+paths:
+  /:
+    get:
+      produces:
+      - text/html
+      responses:
+        "200":
+          description: OK
+          schema:
+            type: string
+      summary: Serve Root Page
+      tags:
+      - Pages
+  /api/login:
+    post:
+      consumes:
+      - application/x-www-form-urlencoded
+      parameters:
+      - description: username
+        in: formData
+        name: username
+        required: true
+        type: string
+      - description: password
+        in: formData
+        name: password
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/main.AuthResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/main.HTTPValidationError'
+        "422":
+          description: Unprocessable Entity
+          schema:
+            $ref: '#/definitions/main.HTTPValidationError'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/main.HTTPValidationError'
+      summary: login
+      tags:
+      - API
+  /api/logout:
+    get:
+      description: logs out a user
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/main.AuthResponse'
+      summary: logout
+      tags:
+      - API
+  /api/register:
+    post:
+      consumes:
+      - application/x-www-form-urlencoded
+      parameters:
+      - description: username
+        in: formData
+        name: username
+        required: true
+        type: string
+      - description: email
+        in: formData
+        name: email
+        required: true
+        type: string
+      - description: password
+        in: formData
+        name: password
+        required: true
+        type: string
+      - description: password2
+        in: formData
+        name: password2
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/main.AuthResponse'
+        "422":
+          description: Unprocessable Entity
+          schema:
+            $ref: '#/definitions/main.HTTPValidationError'
+      summary: register
+      tags:
+      - API
+  /api/search:
+    get:
+      description: get user input and search
+      parameters:
+      - description: q
+        in: header
+        name: q
+        required: true
+        type: string
+      - description: langauge
+        in: header
+        name: langauge
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/main.SearchResponse'
+      summary: search
+      tags:
+      - API
+  /api/weather:
+    get:
+      description: get weather from api
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/main.WeatherResponse'
+      summary: weather
+      tags:
+      - API
+  /login:
+    get:
+      produces:
+      - text/html
+      responses:
+        "200":
+          description: OK
+          schema:
+            type: string
+      summary: Serve Login Page
+      tags:
+      - Pages
+  /register:
+    get:
+      produces:
+      - text/htmljson
+      responses:
+        "200":
+          description: OK
+          schema:
+            type: string
+      summary: Serve Register Page
+      tags:
+      - Pages
+  /weather:
+    get:
+      produces:
+      - text/html
+      responses:
+        "200":
+          description: OK
+          schema:
+            type: string
+      summary: Serve Weather Page
+      tags:
+      - Pages
+schemes:
+- http
+swagger: "2.0"
