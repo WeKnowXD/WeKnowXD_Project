@@ -78,9 +78,9 @@ func testSessions(w http.ResponseWriter, r *http.Request) {
 }
 
 type ValidationError struct {
-	Loc  []string `json:"loc"`
-	Msg  string   `json:"msg"`
-	Type string   `json:"type"`
+	Loc  []any  `json:"loc"`
+	Msg  string `json:"msg"`
+	Type string `json:"type"`
 }
 
 type HTTPValidationError struct {
@@ -180,7 +180,7 @@ func apiLogin(w http.ResponseWriter, r *http.Request) {
 	if err := r.ParseForm(); err != nil {
 		writeJSON(w, http.StatusUnprocessableEntity, HTTPValidationError{
 			Detail: []ValidationError{{
-				Loc:  []string{"body"},
+				Loc:  []any{"body", 0},
 				Msg:  "Invalid form data or a bad request",
 				Type: "value_error.missing",
 			}},
@@ -191,7 +191,7 @@ func apiLogin(w http.ResponseWriter, r *http.Request) {
 	var missing []ValidationError
 	for _, f := range []string{"username", "password"} {
 		if _, ok := r.PostForm[f]; !ok {
-			missing = append(missing, ValidationError{Loc: []string{"body", f}, Msg: "Field required", Type: "missing"})
+			missing = append(missing, ValidationError{Loc: []any{"body", f}, Msg: "Field required", Type: "missing"})
 		}
 	}
 	if len(missing) > 0 {
@@ -384,13 +384,13 @@ func postRegister(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if errorMsg != "" {
-		response := map[string]any{
-			"statusCode": http.StatusBadRequest,
-			"message":    errorMsg,
-		}
-		w.Header().Set("Content-Type", "application/json")
-		w.WriteHeader(http.StatusBadRequest)
-		json.NewEncoder(w).Encode(response)
+		writeJSON(w, http.StatusUnprocessableEntity, HTTPValidationError{
+			Detail: []ValidationError{{
+				Loc:  []any{"body", 0},
+				Msg:  errorMsg,
+				Type: "value_error.UnprocessableEntity",
+			}},
+		})
 		return
 	}
 
