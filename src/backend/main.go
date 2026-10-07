@@ -29,6 +29,14 @@ import (
 	_ "github.com/mattn/go-sqlite3"
 )
 
+//	@title			WeKnowXD
+//	@version		1.0
+//	@description	Open API spec for WeKnowXD
+
+//	@host		51.120.81.214:8080
+//	@BasePath	/
+//	@Schemes	http
+
 var db *sql.DB // shared connection, every handler in this file can just use this directly
 var templates = template.Must(template.ParseFiles(
 	"templates/search.html",
@@ -68,7 +76,9 @@ func router(mux *http.ServeMux) {
 	mux.HandleFunc("POST /api/register", postRegister)
 	mux.HandleFunc("POST /api/login", apiLogin)
 	mux.HandleFunc("GET /api/logout", apiLogout)
-	mux.HandleFunc("POST /test", testSessions)
+
+	// use testSessions if session related issues appear
+	// mux.HandleFunc("POST /test", testSessions)
 
 	mux.Handle("/static/", http.StripPrefix("/static/", http.FileServer(http.Dir("static"))))
 }
@@ -83,10 +93,16 @@ type ValidationError struct {
 	Type string   `json:"type"`
 }
 
+// Response HTTPValidationError
+//
+//	@Description	HTTPValidationError
 type HTTPValidationError struct {
 	Detail []ValidationError `json:"detail"`
 }
 
+// Response AuthData
+//
+//	@Description	AuthData
 type AuthResponse struct {
 	StatusCode int    `json:"statusCode"`
 	Message    string `json:"message"`
@@ -98,6 +114,9 @@ type SessionData struct {
 	ExpiresAt time.Time
 }
 
+// Response UserData
+//
+//	@Description	UserData
 type User struct {
 	Id       int
 	Username string
@@ -114,27 +133,39 @@ type PageData struct {
 	}
 }
 
+// Response RegisterData
+//
+//	@Description	RegisterData
 type RegisterData struct {
 	Error    string
 	Username string
 	Email    string
 }
 
+// Response LoginData
+//
+//	@Description	LoginData
 type LoginData struct {
 	Error    string
 	Username string
 }
 
 type SearchResult struct {
-	Title   string `json:"title"`
-	URL     string `json:"url"`
-	Content string `json:"content"`
+	Title   string `swaggerignore:"true"`
+	URL     string `swaggerignore:"true"`
+	Content string `swaggerignore:"true"`
 }
 
+// Response Data
+//
+//	@Description	data
 type SearchResponse struct {
 	Data []SearchResult `json:"data"`
 }
 
+// Response WeatherData
+//
+//	@Description	WeatherData
 type WeatherResponse struct {
 	Data map[string]any `json:"data"`
 }
@@ -143,6 +174,14 @@ type WeatherResponse struct {
 // Once that's built, replace this with a struct (e.g. LayoutData) holding
 // User (nil if not logged in) and Flashes ([]string), so layout.html's
 // {{ if .User }} and {{ if .Flashes }} blocks actually have data to work with.
+
+// layoutHandler godoc
+//
+//	@Summary	Serve Root Page
+//	@Tags		Pages
+//	@Produce	text/html
+//	@Router		/ [get]
+//	@Success	200	{object}	string
 func layoutHandler(w http.ResponseWriter, r *http.Request) {
 	templates.ExecuteTemplate(w, "layout.html", nil)
 }
@@ -152,14 +191,35 @@ func searchHandler(w http.ResponseWriter, r *http.Request) {
 	templates.ExecuteTemplate(w, "layout.html", data)
 }
 
+// registerHandler godoc
+//
+//	@Summary	Serve Register Page
+//	@Tags		Pages
+//	@Produce	text/htmljson
+//	@Success	200	{object}	string
+//	@Router		/register [get]
 func registerHandler(w http.ResponseWriter, r *http.Request) {
 	templates.ExecuteTemplate(w, "register.html", RegisterData{})
 }
 
+// loginHandler godoc
+//
+//	@Summary	Serve Login Page
+//	@Tags		Pages
+//	@Produce	text/html
+//	@Success	200	{object}	string
+//	@Router		/login [get]
 func loginHandler(w http.ResponseWriter, r *http.Request) {
 	templates.ExecuteTemplate(w, "login.html", LoginData{})
 }
 
+// weatherHandler godoc
+//
+//	@Summary	Serve Weather Page
+//	@Tags		Pages
+//	@Produce	text/html
+//	@Success	200	{object}	string
+//	@Router		/weather [get]
 func weatherHandler(w http.ResponseWriter, r *http.Request) {
 	templates.ExecuteTemplate(w, "weather.html", LoginData{})
 }
@@ -176,6 +236,19 @@ func writeJSON(w http.ResponseWriter, status int, body any) {
 	json.NewEncoder(w).Encode(body)
 }
 
+// apiLogin godoc
+//
+//	@Summary	login
+//	@Tags		API
+//	@Accept		application/x-www-form-urlencoded
+//	@Produce	json
+//	@Param		username	formData	string	true	"username"
+//	@Param		password	formData	string	true	"password"
+//	@Success	200			{object}	AuthResponse
+//	@Failure	401			{object}	HTTPValidationError
+//	@Failure	422			{object}	HTTPValidationError
+//	@Failure	500			{object}	HTTPValidationError
+//	@Router		/api/login [post]
 func apiLogin(w http.ResponseWriter, r *http.Request) {
 	if err := r.ParseForm(); err != nil {
 		writeJSON(w, http.StatusUnprocessableEntity, HTTPValidationError{
@@ -239,6 +312,13 @@ func apiLogin(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, AuthResponse{StatusCode: http.StatusOK, Message: "Login successful"})
 }
 
+// apiLogout godoc
+//
+//	@Summary		logout
+//	@Description	logs out a user
+//	@Tags			API
+//	@Success		200	{object}	AuthResponse
+//	@Router			/api/logout [get]
 func apiLogout(w http.ResponseWriter, r *http.Request) {
 	cookie, err := r.Cookie("session_token")
 	if errors.Is(err, http.ErrNoCookie) {
@@ -319,6 +399,16 @@ func initDB() {
 	}
 }
 
+// getSearch godoc
+//
+//	@Summary		search
+//	@Description	get user input and search
+//	@Tags			API
+//	@Param			q			header	string	true	"q"
+//	@Param			langauge	header	string	true	"langauge"
+//	@Produce		json
+//	@Success		200	{object}	SearchResponse
+//	@Router			/api/search [get]
 func getSearch(w http.ResponseWriter, r *http.Request) {
 	q := r.URL.Query().Get("q") // whatever the user typed into the search bar
 	language := r.URL.Query().Get("language")
@@ -358,6 +448,19 @@ func getSearch(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, SearchResponse{Data: results})
 }
 
+// postRegister godoc
+//
+//	@Summary	register
+//	@Tags		API
+//	@Accept		application/x-www-form-urlencoded
+//	@Produce	json
+//	@Param		username	formData	string	true	"username"
+//	@Param		email		formData	string	true	"email"
+//	@Param		password	formData	string	true	"password"
+//	@Param		password2	formData	string	false	"password2"
+//	@Success	200			{object}	AuthResponse
+//	@Failure	422			{object}	HTTPValidationError
+//	@Router		/api/register [post]
 func postRegister(w http.ResponseWriter, r *http.Request) {
 	// this route gets form data, not JSON, so FormValue instead of decoding a JSON body
 	username := r.FormValue("username")
@@ -459,6 +562,14 @@ func fetchWeather() (map[string]any, error) {
 	return weatherData, nil
 }
 
+// getSearch godoc
+//
+//	@Summary		weather
+//	@Description	get weather from api
+//	@Tags			API
+//	@Produce		json
+//	@Success		200	{object} WeatherResponse
+//	@Router			/api/weather [get]
 func apiWeather(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 
@@ -494,4 +605,5 @@ func apiWeather(w http.ResponseWriter, r *http.Request) {
 
 	// spec wants it wrapped in "data"
 	json.NewEncoder(w).Encode(map[string]any{"data": weatherCache})
+
 }
