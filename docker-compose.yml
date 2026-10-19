@@ -1,0 +1,10 @@
+services:
+  app:
+    image: ghcr.io/yacqubjad/weknowxd:latest
+    ports:
+      - "8081:8081"
+    environment:
+      - WEATHER_API_KEY=${WEATHER_API_KEY}
+    volumes:
+      - ./whoknows.db:/app/whoknows.db
+    restart: unless-stopped

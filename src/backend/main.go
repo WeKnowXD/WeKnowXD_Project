@@ -78,9 +78,9 @@ func testSessions(w http.ResponseWriter, r *http.Request) {
 }
 
 type ValidationError struct {
-	Loc  []string `json:"loc"`
-	Msg  string   `json:"msg"`
-	Type string   `json:"type"`
+	Loc  []any  `json:"loc"`
+	Msg  string `json:"msg"`
+	Type string `json:"type"`
 }
 
 type HTTPValidationError struct {
@@ -125,6 +125,20 @@ type LoginData struct {
 	Username string
 }
 
+type SearchResult struct {
+	Title   string `json:"title"`
+	URL     string `json:"url"`
+	Content string `json:"content"`
+}
+
+type SearchResponse struct {
+	Data []SearchResult `json:"data"`
+}
+
+type WeatherResponse struct {
+	Data map[string]any `json:"data"`
+}
+
 // TODO: currently passing nil since we don't have session/auth handling yet.
 // Once that's built, replace this with a struct (e.g. LayoutData) holding
 // User (nil if not logged in) and Flashes ([]string), so layout.html's
@@ -166,7 +180,7 @@ func apiLogin(w http.ResponseWriter, r *http.Request) {
 	if err := r.ParseForm(); err != nil {
 		writeJSON(w, http.StatusUnprocessableEntity, HTTPValidationError{
 			Detail: []ValidationError{{
-				Loc:  []string{"body"},
+				Loc:  []any{"body", 0},
 				Msg:  "Invalid form data or a bad request",
 				Type: "value_error.missing",
 			}},
@@ -177,7 +191,7 @@ func apiLogin(w http.ResponseWriter, r *http.Request) {
 	var missing []ValidationError
 	for _, f := range []string{"username", "password"} {
 		if _, ok := r.PostForm[f]; !ok {
-			missing = append(missing, ValidationError{Loc: []string{"body", f}, Msg: "Field required", Type: "missing"})
+			missing = append(missing, ValidationError{Loc: []any{"body", f}, Msg: "Field required", Type: "missing"})
 		}
 	}
 	if len(missing) > 0 {
@@ -309,9 +323,7 @@ func getSearch(w http.ResponseWriter, r *http.Request) {
 	q := r.URL.Query().Get("q") // whatever the user typed into the search bar
 	language := r.URL.Query().Get("language")
 	if q == "" {
-		response := map[string]any{"data": []map[string]any{}}
-		w.Header().Set("Content-Type", "application/json")
-		json.NewEncoder(w).Encode(response)
+		writeJSON(w, http.StatusOK, SearchResponse{Data: []SearchResult{}})
 		return
 	}
 	if language == "" {
@@ -327,20 +339,15 @@ func getSearch(w http.ResponseWriter, r *http.Request) {
 	}
 	defer rows.Close() // makes sure this closes once the function's done, no matter how it exits
 
-	var results []map[string]any
-	for rows.Next() { // grabs one row at a time until there's nothing left
-		var title, url, content string
-		if err := rows.Scan(&title, &url, &content); err != nil { // pulls that row's values into these three
+	results := []SearchResult{} // empty slice instead of nil, so no matches gives [] and not null
+	for rows.Next() {           // grabs one row at a time until there's nothing left
+		var res SearchResult
+		if err := rows.Scan(&res.Title, &res.URL, &res.Content); err != nil { // pulls that row's values into the struct
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return
 		}
-		results = append(results, map[string]any{
-			"title":   title,
-			"url":     url,
-			"content": content,
-		})
+		results = append(results, res)
 	}
-	response := map[string]any{"data": results}
 
 	// rows.Next() returning false could mean "all done" or "something broke" — this catches the second case
 	if err := rows.Err(); err != nil {
@@ -348,8 +355,7 @@ func getSearch(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(response)
+	writeJSON(w, http.StatusOK, SearchResponse{Data: results})
 }
 
 func postRegister(w http.ResponseWriter, r *http.Request) {
@@ -378,13 +384,13 @@ func postRegister(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if errorMsg != "" {
-		response := map[string]any{
-			"statusCode": http.StatusBadRequest,
-			"message":    errorMsg,
-		}
-		w.Header().Set("Content-Type", "application/json")
-		w.WriteHeader(http.StatusBadRequest)
-		json.NewEncoder(w).Encode(response)
+		writeJSON(w, http.StatusUnprocessableEntity, HTTPValidationError{
+			Detail: []ValidationError{{
+				Loc:  []any{"body", 0},
+				Msg:  errorMsg,
+				Type: "value_error.UnprocessableEntity",
+			}},
+		})
 		return
 	}
 
