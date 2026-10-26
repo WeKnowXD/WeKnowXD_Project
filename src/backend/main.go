@@ -319,6 +319,8 @@ func initDB() {
 	}
 }
 
+const snippetLength = 800
+
 func getSearch(w http.ResponseWriter, r *http.Request) {
 	q := r.URL.Query().Get("q") // whatever the user typed into the search bar
 	language := r.URL.Query().Get("language")
@@ -330,9 +332,14 @@ func getSearch(w http.ResponseWriter, r *http.Request) {
 		language = "en"
 	}
 
-	// the ? is a stand-in, the real value gets slotted in safely as the second argument
+	// the ? is a stand-in, the real value gets slotted in safely as the argument
 	// this is basically to stop SQL injections
-	rows, err := db.Query("SELECT title, url, content FROM pages WHERE language = ? AND content LIKE ?", language, "%"+q+"%")
+	// substr cuts the text inside the database, so the full content never gets sent to the browser
+	// we grab 1 extra character so makeSnippet can tell if the text was actually cut off
+	rows, err := db.Query(
+		"SELECT title, url, substr(content, 1, ?) FROM pages WHERE language = ? AND content LIKE ?",
+		snippetLength+1, language, "%"+q+"%",
+	)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
@@ -346,16 +353,28 @@ func getSearch(w http.ResponseWriter, r *http.Request) {
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return
 		}
+		res.Content = makeSnippet(res.Content, snippetLength)
 		results = append(results, res)
 	}
 
-	// rows.Next() returning false could mean "all done" or "something broke" — this catches the second case
+	// rows.Next() returning false could mean "all done" or "something broke", this catches the second case
 	if err := rows.Err(); err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
 
 	writeJSON(w, http.StatusOK, SearchResponse{Data: results})
+}
+
+func makeSnippet(text string, max int) string {
+	if len(text) <= max {
+		return text
+	}
+	cut := text[:max]
+	if i := strings.LastIndex(cut, " "); i > 0 {
+		cut = cut[:i]
+	}
+	return strings.TrimSpace(cut) + "..."
 }
 
 func postRegister(w http.ResponseWriter, r *http.Request) {
