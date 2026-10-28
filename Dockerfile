@@ -11,7 +11,7 @@ COPY src/backend/go.mod src/backend/go.sum ./
 RUN go mod download
 
 COPY src/backend/ ./
-RUN CGO_ENABLED=1 go build -o /out/server .
+RUN CGO_ENABLED=1 go build -tags fts5 -o /out/server .
 
 # ---------- Trin 2: lille runtime-image ----------
 FROM debian:bookworm-slim
