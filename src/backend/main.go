@@ -335,11 +335,8 @@ func getSearch(w http.ResponseWriter, r *http.Request) {
 	// JOIN pages so language filtering happens on the real table, not inside the FTS index
 	// MATCH does the full-text search; substr+makeSnippet trims the content before sending it to the browser
 	rows, err := db.Query(
-		`SELECT p.title, p.url, substr(p.content, 1, ?)
-		 FROM pages p
-		 JOIN pages_fts ON pages_fts.rowid = p.rowid
-		 WHERE pages_fts MATCH ? AND p.language = ?`,
-		snippetLength+1, q, language,
+		"SELECT title, url, substr(content, 1, ?) FROM pages WHERE language = ? AND content LIKE ?",
+		snippetLength+1, language, "%"+q+"%",
 	)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
