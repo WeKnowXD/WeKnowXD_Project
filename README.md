@@ -5,6 +5,6 @@
    ex. "cp .env.example .env" or just create your own .env file manually
 2. Fill in the values in `.env` (group got the weather API key)
 3. Run the server:
-   go run .
+   go run ./cmd/server
 
 `.env` is gitignored, **never commit it**.

@@ -12,7 +12,6 @@ jobs:
       - uses: actions/checkout@v4
       - uses: actions/setup-go@v5
         with:
-          go-version-file: src/backend/go.mod
+          go-version-file: go.mod
       - run: go install github.com/mgechev/revive@latest
       - run: revive -set_exit_status ./...
-        working-directory: src/backend
