@@ -42,6 +42,13 @@ var (
 	SessionsMutex sync.RWMutex
 )
 
+// the different ways a session check can fail, getSession returns one of these
+var (
+	errNoSession      = errors.New("no session cookie")
+	errSessionUnknown = errors.New("session not found")
+	errSessionExpired = errors.New("session expired")
+)
+
 func main() {
 
 	if err := godotenv.Load(); err != nil {
@@ -68,13 +75,45 @@ func router(mux *http.ServeMux) {
 	mux.HandleFunc("POST /api/register", postRegister)
 	mux.HandleFunc("POST /api/login", apiLogin)
 	mux.HandleFunc("GET /api/logout", apiLogout)
-	mux.HandleFunc("POST /test", testSessions)
+	mux.HandleFunc("GET /api/session", apiSession)
 
 	mux.Handle("/static/", http.StripPrefix("/static/", http.FileServer(http.Dir("static"))))
 }
 
-func testSessions(w http.ResponseWriter, r *http.Request) {
-	fmt.Println(Sessions)
+// the only place that reads a session, checks the cookie exists, the token is known and it hasn't expired
+func getSession(r *http.Request) (SessionData, error) {
+	cookie, err := r.Cookie("session_token")
+	if err != nil {
+		return SessionData{}, errNoSession
+	}
+
+	SessionsMutex.RLock()
+	session, ok := Sessions[cookie.Value]
+	SessionsMutex.RUnlock()
+
+	if !ok {
+		return SessionData{}, errSessionUnknown
+	}
+
+	if time.Now().After(session.ExpiresAt) {
+		SessionsMutex.Lock()
+		delete(Sessions, cookie.Value) // drop it here so old sessions don't pile up
+		SessionsMutex.Unlock()
+		return SessionData{}, errSessionExpired
+	}
+
+	return session, nil
+}
+
+// tells the caller if their session cookie is still valid and who it belongs to
+func apiSession(w http.ResponseWriter, r *http.Request) {
+	session, err := getSession(r)
+	if err != nil {
+		writeJSON(w, http.StatusUnauthorized, AuthResponse{StatusCode: http.StatusUnauthorized, Message: err.Error()})
+		return
+	}
+
+	writeJSON(w, http.StatusOK, AuthResponse{StatusCode: http.StatusOK, Message: session.Username})
 }
 
 type ValidationError struct {
@@ -164,10 +203,12 @@ func weatherHandler(w http.ResponseWriter, r *http.Request) {
 	templates.ExecuteTemplate(w, "weather.html", LoginData{})
 }
 
-func generateSessionToken() string {
+func generateSessionToken() (string, error) {
 	b := make([]byte, 16)
-	rand.Read(b)
-	return hex.EncodeToString(b)
+	if _, err := rand.Read(b); err != nil {
+		return "", err
+	}
+	return hex.EncodeToString(b), nil
 }
 
 func writeJSON(w http.ResponseWriter, status int, body any) {
@@ -217,7 +258,12 @@ func apiLogin(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	token := generateSessionToken()
+	token, err := generateSessionToken()
+	if err != nil {
+		log.Println(err)
+		writeJSON(w, http.StatusInternalServerError, AuthResponse{StatusCode: http.StatusInternalServerError, Message: "server error"})
+		return
+	}
 
 	SessionsMutex.Lock()
 	Sessions[token] = SessionData{
@@ -257,6 +303,9 @@ func apiLogout(w http.ResponseWriter, r *http.Request) {
 	}
 
 	SessionsMutex.Lock()
+	if _, ok := Sessions[cookie.Value]; !ok {
+		log.Println("logout: unknown session") // still clear the cookie below so the user ends up logged out
+	}
 	delete(Sessions, cookie.Value)
 	SessionsMutex.Unlock()
 
