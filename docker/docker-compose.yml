@@ -6,5 +6,5 @@ services:
     environment:
       - WEATHER_API_KEY=${WEATHER_API_KEY}
     volumes:
-      - ./whoknows.db:/app/whoknows.db
+      - ./data:/app/data
     restart: unless-stopped
