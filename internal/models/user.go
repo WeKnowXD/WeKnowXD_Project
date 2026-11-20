@@ -6,6 +6,7 @@ type SessionData struct {
 	UserID    int
 	Username  string
 	ExpiresAt time.Time
+	LastSeen  time.Time
 }
 
 type User struct {
