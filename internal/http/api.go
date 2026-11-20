@@ -30,9 +30,13 @@ func getSession(r *http.Request) (models.SessionData, error) {
 		return models.SessionData{}, errNoSession
 	}
 
-	auth.SessionsMutex.RLock()
+	auth.SessionsMutex.Lock()
 	session, ok := auth.Sessions[cookie.Value]
-	auth.SessionsMutex.RUnlock()
+	if ok {
+		session.LastSeen = time.Now()
+		auth.Sessions[cookie.Value] = session
+	}
+	auth.SessionsMutex.Unlock()
 
 	if !ok {
 		return models.SessionData{}, errSessionUnknown
@@ -57,6 +61,13 @@ func apiSession(w http.ResponseWriter, r *http.Request) {
 	}
 
 	writeJSON(w, http.StatusOK, models.AuthResponse{StatusCode: http.StatusOK, Message: session.Username})
+}
+
+// only exposes the number of distinct logged-in users active in the last 10 minutes
+func apiActiveUsers(w http.ResponseWriter, r *http.Request) {
+	writeJSON(w, http.StatusOK, map[string]any{
+		"count": auth.ActiveUsers(10 * time.Minute),
+	})
 }
 
 func apiLogin(w http.ResponseWriter, r *http.Request) {
@@ -112,6 +123,7 @@ func apiLogin(w http.ResponseWriter, r *http.Request) {
 		UserID:    foundUser.Id,
 		Username:  foundUser.Username,
 		ExpiresAt: time.Now().Add(24 * time.Hour),
+		LastSeen:  time.Now(),
 	}
 	auth.SessionsMutex.Unlock()
 
