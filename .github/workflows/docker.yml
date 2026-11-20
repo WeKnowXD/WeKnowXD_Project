@@ -1,4 +1,4 @@
-name: Build and push image
+name: Build, Push, Deploy image
 
 on:
   push:
@@ -32,5 +32,25 @@ jobs:
       - uses: docker/build-push-action@v6
         with:
           context: .
+          file: docker/Dockerfile
           push: true
           tags: ${{ steps.meta.outputs.tags }}
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: webfactory/ssh-agent@v0.10.0
+        with:
+          ssh-private-key: ${{ secrets.VM_SSH_KEY }}
+
+      - name: Deploy to VM
+        env:
+          VM_HOST: ${{ secrets.VM_HOST }}
+          VM_USER: ${{ secrets.VM_USER }}
+        run: |
+          ssh -o StrictHostKeyChecking=accept-new -o BatchMode=yes \
+            "$VM_USER@$VM_HOST" \
+            'cd ~/WeKnowDocker && podman-compose pull && podman-compose up -d'
