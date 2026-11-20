@@ -139,21 +139,13 @@ func apiLogin(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, models.AuthResponse{StatusCode: http.StatusOK, Message: "Login successful"})
 }
 
-func apiLogout(w http.ResponseWriter, r *http.Request) {
+func logoutSession(r *http.Request) (int, string) {
 	cookie, err := r.Cookie("session_token")
 	if errors.Is(err, http.ErrNoCookie) {
-		writeJSON(w, http.StatusBadRequest, models.AuthResponse{
-			StatusCode: http.StatusBadRequest,
-			Message:    "no cookie was found",
-		})
-		return
+		return http.StatusBadRequest, "no cookie was found"
 	} else if err != nil {
 		log.Println(err)
-		writeJSON(w, http.StatusInternalServerError, models.AuthResponse{
-			StatusCode: http.StatusInternalServerError,
-			Message:    "server error",
-		})
-		return
+		return http.StatusInternalServerError, "server error"
 	}
 
 	auth.SessionsMutex.Lock()
@@ -163,6 +155,10 @@ func apiLogout(w http.ResponseWriter, r *http.Request) {
 	delete(auth.Sessions, cookie.Value)
 	auth.SessionsMutex.Unlock()
 
+	return http.StatusOK, "Logout successful"
+}
+
+func clearSessionCookie(w http.ResponseWriter) {
 	http.SetCookie(w, &http.Cookie{
 		Name:     "session_token",
 		Value:    "",
@@ -170,11 +166,23 @@ func apiLogout(w http.ResponseWriter, r *http.Request) {
 		MaxAge:   -1,
 		HttpOnly: true,
 	})
+}
 
-	writeJSON(w, http.StatusOK, models.AuthResponse{
-		StatusCode: http.StatusOK,
-		Message:    "Logout successful",
-	})
+func apiLogout(w http.ResponseWriter, r *http.Request) {
+	status, msg := logoutSession(r)
+	if status != http.StatusOK {
+		writeJSON(w, status, models.AuthResponse{StatusCode: status, Message: msg})
+		return
+	}
+
+	clearSessionCookie(w)
+	writeJSON(w, status, models.AuthResponse{StatusCode: status, Message: msg})
+}
+
+func logoutHandler(w http.ResponseWriter, r *http.Request) {
+	logoutSession(r) // redirect even if there was no cookie
+	clearSessionCookie(w)
+	http.Redirect(w, r, "/", http.StatusSeeOther)
 }
 
 func apiSearch(w http.ResponseWriter, r *http.Request) {

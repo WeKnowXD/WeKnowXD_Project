@@ -7,6 +7,8 @@ type PageData struct {
 		URL         string
 		Description string
 	}
+	Flashes []string
+	User    *SessionData
 }
 
 type RegisterData struct {

@@ -6,12 +6,20 @@ import (
 	"github.com/WeKnowXD/WeKnowXD_Project/internal/models"
 )
 
+func currentUser(r *http.Request) *models.SessionData {
+	s, err := getSession(r)
+	if err != nil {
+		return nil
+	}
+	return &s
+}
+
 func layoutHandler(w http.ResponseWriter, r *http.Request) {
-	templates.ExecuteTemplate(w, "layout.html", nil)
+	templates.ExecuteTemplate(w, "layout.html", models.PageData{User: currentUser(r)})
 }
 
 func searchHandler(w http.ResponseWriter, r *http.Request) {
-	data := models.PageData{Query: r.URL.Query().Get("q")}
+	data := models.PageData{Query: r.URL.Query().Get("q"), User: currentUser(r)}
 	templates.ExecuteTemplate(w, "layout.html", data)
 }
 

@@ -19,6 +19,7 @@ func Router(mux *http.ServeMux) {
 	mux.HandleFunc("POST /api/register", apiRegister)
 	mux.HandleFunc("POST /api/login", apiLogin)
 	mux.HandleFunc("GET /api/logout", apiLogout)
+	mux.HandleFunc("GET /logout", logoutHandler)
 	mux.HandleFunc("GET /api/session", apiSession)
 	mux.HandleFunc("GET /api/active-users", apiActiveUsers)
 
