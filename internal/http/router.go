@@ -19,7 +19,7 @@ func Router(mux *http.ServeMux) {
 	mux.HandleFunc("POST /api/register", apiRegister)
 	mux.HandleFunc("POST /api/login", apiLogin)
 	mux.HandleFunc("GET /api/logout", apiLogout)
-	mux.HandleFunc("POST /test", testSessions)
+	mux.HandleFunc("GET /api/session", apiSession)
 
 	mux.Handle("/static/", http.FileServer(http.FS(web.Static)))
 }

@@ -16,8 +16,47 @@ import (
 	"github.com/WeKnowXD/WeKnowXD_Project/internal/weather"
 )
 
-func testSessions(w http.ResponseWriter, r *http.Request) {
-	fmt.Println(auth.Sessions)
+// the different ways a session check can fail, getSession returns one of these
+var (
+	errNoSession      = errors.New("no session cookie")
+	errSessionUnknown = errors.New("session not found")
+	errSessionExpired = errors.New("session expired")
+)
+
+// the only place that reads a session, checks the cookie exists, the token is known and it hasn't expired
+func getSession(r *http.Request) (models.SessionData, error) {
+	cookie, err := r.Cookie("session_token")
+	if err != nil {
+		return models.SessionData{}, errNoSession
+	}
+
+	auth.SessionsMutex.RLock()
+	session, ok := auth.Sessions[cookie.Value]
+	auth.SessionsMutex.RUnlock()
+
+	if !ok {
+		return models.SessionData{}, errSessionUnknown
+	}
+
+	if time.Now().After(session.ExpiresAt) {
+		auth.SessionsMutex.Lock()
+		delete(auth.Sessions, cookie.Value) // drop it here so old sessions don't pile up
+		auth.SessionsMutex.Unlock()
+		return models.SessionData{}, errSessionExpired
+	}
+
+	return session, nil
+}
+
+// tells the caller if their session cookie is still valid and who it belongs to
+func apiSession(w http.ResponseWriter, r *http.Request) {
+	session, err := getSession(r)
+	if err != nil {
+		writeJSON(w, http.StatusUnauthorized, models.AuthResponse{StatusCode: http.StatusUnauthorized, Message: err.Error()})
+		return
+	}
+
+	writeJSON(w, http.StatusOK, models.AuthResponse{StatusCode: http.StatusOK, Message: session.Username})
 }
 
 func apiLogin(w http.ResponseWriter, r *http.Request) {
@@ -61,7 +100,12 @@ func apiLogin(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	token := auth.GenerateSessionToken()
+	token, err := auth.GenerateSessionToken()
+	if err != nil {
+		log.Println(err)
+		writeJSON(w, http.StatusInternalServerError, models.AuthResponse{StatusCode: http.StatusInternalServerError, Message: "server error"})
+		return
+	}
 
 	auth.SessionsMutex.Lock()
 	auth.Sessions[token] = models.SessionData{
@@ -101,6 +145,9 @@ func apiLogout(w http.ResponseWriter, r *http.Request) {
 	}
 
 	auth.SessionsMutex.Lock()
+	if _, ok := auth.Sessions[cookie.Value]; !ok {
+		log.Println("logout: unknown session") // still clear the cookie below so the user ends up logged out
+	}
 	delete(auth.Sessions, cookie.Value)
 	auth.SessionsMutex.Unlock()
 

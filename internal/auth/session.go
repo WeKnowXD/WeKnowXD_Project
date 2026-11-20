@@ -17,8 +17,10 @@ func Init() {
 	Sessions = make(map[string]models.SessionData)
 }
 
-func GenerateSessionToken() string {
+func GenerateSessionToken() (string, error) {
 	b := make([]byte, 16)
-	rand.Read(b)
-	return hex.EncodeToString(b)
+	if _, err := rand.Read(b); err != nil {
+		return "", err
+	}
+	return hex.EncodeToString(b), nil
 }
