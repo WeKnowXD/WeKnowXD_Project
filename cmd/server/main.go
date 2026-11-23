@@ -13,6 +13,7 @@ func main() {
 	config.Load()
 	auth.Init()
 	database.Init(config.DBPath())
+	database.InitFTS()
 	mux := http.NewServeMux()
 	apphttp.Router(mux)
 	http.ListenAndServe(config.Addr(), mux)
