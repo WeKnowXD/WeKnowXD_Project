@@ -2,6 +2,7 @@
 *.db
 data/*
 !data/.gitkeep
+logs/
 bin/
 .venv/
 __pycache__/

@@ -7,10 +7,12 @@ import (
 	"github.com/WeKnowXD/WeKnowXD_Project/internal/config"
 	"github.com/WeKnowXD/WeKnowXD_Project/internal/database"
 	apphttp "github.com/WeKnowXD/WeKnowXD_Project/internal/http"
+	"github.com/WeKnowXD/WeKnowXD_Project/internal/logging"
 )
 
 func main() {
 	config.Load()
+	logging.Init(config.LogPath())
 	auth.Init()
 	database.Init(config.DBPath())
 	database.InitFTS()
