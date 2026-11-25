@@ -50,7 +50,7 @@ jobs:
       - name: Docker Scout CVE scan
         uses: docker/scout-action@v1
         with:
-          command: quickview,cves
+          command: quickview,cves,recommendations
           image: registry://${{ env.IMAGE }}
           only-severities: critical,high
           exit-code: false # set to true to fail the pipeline on critical/high CVEs
