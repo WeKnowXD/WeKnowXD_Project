@@ -3,23 +3,15 @@ package database
 import (
 	"database/sql"
 	"log"
-	"os"
-	"path/filepath"
 
-	_ "github.com/mattn/go-sqlite3"
+	_ "github.com/lib/pq"
 )
 
 var DB *sql.DB
 
-func Init(path string) {
-	if dir := filepath.Dir(path); dir != "." {
-		if err := os.MkdirAll(dir, 0o755); err != nil {
-			log.Fatal(err)
-		}
-	}
-
+func Init(dsn string) {
 	var err error
-	DB, err = sql.Open("sqlite3", path)
+	DB, err = sql.Open("postgres", dsn)
 	if err != nil {
 		log.Fatal(err)
 	}

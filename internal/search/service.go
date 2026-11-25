@@ -18,7 +18,7 @@ func Get(db *sql.DB, q string, language string) ([]models.SearchResult, error) {
 	}
 
 	rows, err := db.Query(
-		"SELECT title, url, substr(content, 1, ?) FROM pages WHERE language = ? AND content LIKE ?",
+		"SELECT title, url, LEFT(content, $1) FROM pages WHERE language = $2 AND content LIKE $3",
 		snippetLength+1, language, "%"+q+"%",
 	)
 	if err != nil {

@@ -12,7 +12,7 @@ import (
 func main() {
 	config.Load()
 	auth.Init()
-	database.Init(config.DBPath())
+	database.Init(config.DSN())
 	mux := http.NewServeMux()
 	apphttp.Router(mux)
 	http.ListenAndServe(config.Addr(), mux)

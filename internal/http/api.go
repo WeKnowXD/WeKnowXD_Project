@@ -93,7 +93,7 @@ func apiLogin(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	userList, err := database.QueryDB(reflect.TypeOf(models.User{}), "SELECT * FROM users WHERE username = ?", r.FormValue("username"))
+	userList, err := database.QueryDB(reflect.TypeOf(models.User{}), "SELECT * FROM users WHERE username = $1", r.FormValue("username"))
 	if err != nil {
 		log.Println(err)
 		writeJSON(w, http.StatusInternalServerError, models.AuthResponse{StatusCode: http.StatusInternalServerError, Message: "server error"})
@@ -215,7 +215,7 @@ func apiRegister(w http.ResponseWriter, r *http.Request) {
 		errorMsg = "The two passwords do not match"
 	} else {
 		var existingID int
-		err := database.DB.QueryRow("SELECT id FROM users WHERE username = ?", username).Scan(&existingID)
+		err := database.DB.QueryRow("SELECT id FROM users WHERE username = $1", username).Scan(&existingID)
 		if err == nil {
 			errorMsg = "Username already taken"
 		}
@@ -234,7 +234,7 @@ func apiRegister(w http.ResponseWriter, r *http.Request) {
 
 	hashedPassword := auth.HashPassword(password)
 
-	_, err := database.DB.Exec("INSERT INTO users (username, email, password) VALUES (?, ?, ?)", username, email, hashedPassword)
+	_, err := database.DB.Exec("INSERT INTO users (username, email, password) VALUES ($1, $2, $3)", username, email, hashedPassword)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
