@@ -34,3 +34,7 @@ func loginHandler(w http.ResponseWriter, r *http.Request) {
 func weatherHandler(w http.ResponseWriter, r *http.Request) {
 	templates.ExecuteTemplate(w, "weather.html", models.LoginData{})
 }
+
+func aboutHandler(w http.ResponseWriter, r *http.Request) {
+	templates.ExecuteTemplate(w, "about.html", models.LoginData{})
+}

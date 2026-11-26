@@ -12,4 +12,5 @@ var templates = template.Must(template.ParseFS(web.Templates,
 	"templates/register.html",
 	"templates/login.html",
 	"templates/weather.html",
+	"templates/about.html",
 ))
