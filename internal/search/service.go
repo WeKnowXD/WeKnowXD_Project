@@ -17,14 +17,9 @@ func Get(db *sql.DB, q string, language string) ([]models.SearchResult, error) {
 		language = "en"
 	}
 
-	match := MatchQuery(q)
-	if match == "" {
-		return []models.SearchResult{}, nil
-	}
-
 	rows, err := db.Query(
-		"SELECT p.title, p.url, substr(p.content, 1, ?) FROM pages_fts JOIN pages p ON p.rowid = pages_fts.rowid WHERE pages_fts MATCH ? AND p.language = ? ORDER BY rank",
-		snippetLength+1, match, language,
+		"SELECT title, url, LEFT(content, $1) FROM pages WHERE language = $2 AND content LIKE $3",
+		snippetLength+1, language, "%"+q+"%",
 	)
 	if err != nil {
 		return nil, err
@@ -46,14 +41,6 @@ func Get(db *sql.DB, q string, language string) ([]models.SearchResult, error) {
 	}
 
 	return results, nil
-}
-
-func MatchQuery(q string) string {
-	var terms []string
-	for _, word := range strings.Fields(q) {
-		terms = append(terms, `"`+strings.ReplaceAll(word, `"`, `""`)+`"`)
-	}
-	return strings.Join(terms, " ")
 }
 
 func MakeSnippet(text string, max int) string {

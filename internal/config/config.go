@@ -25,14 +25,12 @@ func Addr() string {
 	return ":8080"
 }
 
-func DBPath() string {
-	if path := os.Getenv("DB_PATH"); path != "" {
-		return path
+func DSN() string {
+	if dsn := os.Getenv("DB_DSN"); dsn != "" {
+		return dsn
 	}
-	if root, ok := projectRoot(); ok {
-		return filepath.Join(root, "data", "whoknows.db")
-	}
-	return filepath.Join("data", "whoknows.db")
+	log.Fatal("DB_DSN environment variable is not set")
+	return ""
 }
 
 func LogPath() string {

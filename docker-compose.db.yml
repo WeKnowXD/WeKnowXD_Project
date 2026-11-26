@@ -1,0 +1,24 @@
+services:
+  db:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: weknowadmin
+      POSTGRES_PASSWORD: ${DB_PASSWORD}
+      POSTGRES_DB: weknows
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    networks:
+      - weknow-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U weknowadmin"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+volumes:
+  pgdata:
+ 
+networks:
+  weknow-network:
+    external: true

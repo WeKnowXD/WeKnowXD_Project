@@ -7,7 +7,7 @@ COPY go.mod go.sum ./
 RUN go mod download
 
 COPY . .
-RUN CGO_ENABLED=1 go build -tags fts5 -o /out/server ./cmd/server
+RUN CGO_ENABLED=0 go build -o /out/server ./cmd/server
 
 FROM debian:bookworm-slim
 
