@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"log"
+	"log/slog"
 	"net/http"
 	"reflect"
 	"strings"
@@ -191,8 +192,13 @@ func apiSearch(w http.ResponseWriter, r *http.Request) {
 
 	results, err := search.Get(database.DB, q, language)
 	if err != nil {
+		slog.Error("search failed", "query", q, "language", language, "err", err)
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
+	}
+
+	if q != "" {
+		slog.Info("user search", "query", q, "language", language, "results", len(results))
 	}
 
 	writeJSON(w, http.StatusOK, models.SearchResponse{Data: results})
