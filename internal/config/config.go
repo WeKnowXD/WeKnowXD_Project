@@ -33,6 +33,16 @@ func DSN() string {
 	return ""
 }
 
+func LogPath() string {
+	if path := os.Getenv("LOG_PATH"); path != "" {
+		return path
+	}
+	if root, ok := projectRoot(); ok {
+		return filepath.Join(root, "logs", "app.log")
+	}
+	return filepath.Join("logs", "app.log")
+}
+
 func projectRoot() (string, bool) {
 	dir, err := os.Getwd()
 	if err != nil {

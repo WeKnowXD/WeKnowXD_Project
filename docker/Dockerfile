@@ -18,7 +18,7 @@ RUN apt-get update \
 WORKDIR /app
 COPY --from=build /out/server ./server
 COPY --from=build /src/web ./web
-RUN mkdir -p /app/data
+RUN mkdir -p /app/data /app/logs
 
 EXPOSE 8081
 CMD ["./server"]
